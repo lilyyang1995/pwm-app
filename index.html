@@ -4,6 +4,15 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>个人储蓄追踪</title>
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#185FA5">
+  <!-- iOS / Safari icons (create PNGs at these sizes and place in project root) -->
+  <link rel="apple-touch-icon" sizes="180x180" href="/icon-180.png">
+  <link rel="apple-touch-icon" sizes="167x167" href="/icon-167.png">
+  <link rel="apple-touch-icon" sizes="152x152" href="/icon-152.png">
+  <link rel="apple-touch-icon" sizes="120x120" href="/icon-120.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
   <style>
     :root{
       --primary:#185FA5;
@@ -151,6 +160,14 @@
   <div id="modalRoot" style="display:none"></div>
 
   <script>
+    // PWA: register service worker if supported
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').then(reg => {
+          console.log('SW registered', reg.scope);
+        }).catch(err => console.warn('SW registration failed', err));
+      });
+    }
     // 更完整的实现：包含设置面板、月度结算、导入/导出、清空、图表色彩规则等
     const DEFAULT = {
       transactions: [],
