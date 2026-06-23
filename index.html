@@ -1,0 +1,544 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>个人储蓄追踪</title>
+  <style>
+    :root{
+      --primary:#185FA5;
+      --success:#3B6D11;
+      --danger:#A32D2D;
+      --muted:#888780;
+      --bg:#f6f7f9;
+      --card:#ffffff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    }
+    html,body{height:100%;margin:0;background:var(--bg);color:#111}
+    .app{max-width:1000px;margin:18px auto;padding:12px}
+    header{display:flex;align-items:center;gap:12px}
+    h1{font-size:1.1rem;margin:0}
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:12px}
+  .grid-three{grid-template-columns:1fr 1fr 320px}
+  @media(max-width:900px){.grid{grid-template-columns:1fr}.grid-three{grid-template-columns:1fr}}
+    .card{background:var(--card);padding:12px;border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,0.06)}
+    .small{font-size:0.85rem;color:var(--muted)}
+    .progress{height:14px;background:#eee;border-radius:8px;overflow:hidden}
+    .prog-inner{height:100%;background:var(--primary);width:0;transition:width .4s ease}
+    .prog-text{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+    .accounts{display:flex;gap:8px;flex-wrap:wrap}
+    .acct{flex:1;padding:10px;border-radius:8px;text-align:center;background:linear-gradient(180deg, rgba(255,255,255,0.6), rgba(0,0,0,0.02))}
+    .txn-form{display:flex;gap:8px;flex-wrap:wrap}
+    .txn-form input,.txn-form select{padding:8px;border-radius:6px;border:1px solid #ddd}
+    .txn-list{margin-top:8px}
+    .txn-item{display:flex;justify-content:space-between;padding:8px;border-bottom:1px dashed #eee}
+    .btn{background:var(--primary);color:#fff;padding:8px 10px;border-radius:8px;border:none}
+    .btn-ghost{background:transparent;border:1px solid #ddd;padding:6px 8px;border-radius:8px}
+    .muted{color:var(--muted)}
+    .chart-row{display:flex;gap:8px;align-items:center}
+    .bar{height:14px;background:var(--primary);border-radius:6px}
+    .danger{background:var(--danger)}
+    .success{background:var(--success)}
+    .controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .right{margin-left:auto}
+    .link{color:var(--primary);cursor:pointer;text-decoration:underline}
+    footer{font-size:0.8rem;color:var(--muted);margin-top:18px;text-align:center}
+    .modal{position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center}
+    .modal .card{width:90%;max-width:640px}
+    .row{display:flex;gap:8px;align-items:center}
+    .flex{flex:1}
+    .danger-text{color:var(--danger)}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>个人储蓄追踪</h1>
+      <div class="right small muted">今日: <span id="today"></span></div>
+    </header>
+
+    <section class="grid">
+      <div class="card">
+        <div class="prog-text"><div>本月已存 / 目标</div><div id="monthSavedText"></div></div>
+        <div class="progress"><div id="monthSavedProg" class="prog-inner"></div></div>
+        <div style="height:8px"></div>
+        <div class="prog-text"><div>本月已花 / 预算</div><div id="monthSpentText"></div></div>
+        <div class="progress"><div id="monthSpentProg" class="prog-inner"></div></div>
+        <div style="height:8px"></div>
+        <div class="small">距离月底剩余 <span id="daysRemaining"></span> 天</div>
+      </div>
+
+      <div class="card">
+        <div class="small">四年储蓄进度</div>
+        <div style="display:flex;align-items:center;margin-top:8px;gap:8px">
+          <div style="flex:1"><div class="progress"><div id="fourYearProg" class="prog-inner"></div></div></div>
+          <div id="fourYearText" class="small muted" style="width:140px;text-align:right"></div>
+        </div>
+        <div style="height:12px"></div>
+        <div class="accounts">
+          <div class="acct">
+            <div class="small">首付安全垫</div>
+            <div id="acct-downpayment">0</div>
+            <div><button class="btn-ghost" data-acct="downpayment">编辑</button></div>
+          </div>
+          <div class="acct">
+            <div class="small">TQQQ</div>
+            <div id="acct-tqqq">0</div>
+            <div><button class="btn-ghost" data-acct="tqqq">编辑</button></div>
+          </div>
+          <div class="acct">
+            <div class="small">短债/货币</div>
+            <div id="acct-bonds">0</div>
+            <div><button class="btn-ghost" data-acct="bonds">编辑</button></div>
+          </div>
+          <div class="acct">
+            <div class="small">零钱</div>
+            <div id="acct-cash">0</div>
+            <div><button class="btn-ghost" data-acct="cash">编辑</button></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="grid grid-three" style="margin-top:12px">
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div><strong>记账（今日）</strong><div class="small muted">快速添加支出/收入</div></div>
+          <div class="controls">
+            <button id="importBtn" class="btn-ghost">导入 JSON</button>
+            <button id="exportBtn" class="btn-ghost">导出 JSON</button>
+            <button id="clearBtn" class="btn-ghost danger-text">清空所有数据</button>
+            <button id="settingsBtn" class="btn">设置</button>
+          </div>
+        </div>
+        <form id="txnForm" class="txn-form" onsubmit="return false;" style="margin-top:10px">
+          <select id="txnType"><option value="expense">支出</option><option value="income">收入</option></select>
+          <input id="txnAmount" placeholder="金额" inputmode="decimal" />
+          <select id="txnCurrency"><option>SGD</option><option>HKD</option><option>RMB</option></select>
+          <select id="txnCategory"><option>餐饮</option><option>交通</option><option>衣物日用</option><option>娱乐杂项</option><option>固定支出</option><option>其他</option></select>
+          <input id="txnNote" placeholder="备注 (可选)" />
+          <input id="txnDate" type="date" />
+          <button id="addTxn" class="btn">添加</button>
+        </form>
+
+        <div class="txn-list" id="txnList"></div>
+        <div style="display:flex;justify-content:space-between;margin-top:8px">
+          <div class="small muted">今日已花: <span id="todaySpent">0</span> SGD</div>
+          <div class="small muted">日均预算: <span id="dailyBudget">36</span> SGD</div>
+        </div>
+      </div>
+
+  <div class="card">
+        <div><strong>本月支出（类别）</strong></div>
+        <div id="categoryBars" style="margin-top:10px"></div>
+        <div style="height:12px"></div>
+        <div><strong>历史与月结</strong> <button id="makeClosing" class="btn-ghost" style="margin-left:8px">创建月度结算</button></div>
+        <div id="monthlyList" class="small muted" style="margin-top:8px"></div>
+      </div>
+
+      <div class="card" id="dailyRecordsCard">
+        <div><strong>每日记录（最近 7 天）</strong></div>
+        <div id="dailyRecords" style="margin-top:8px;max-height:520px;overflow:auto"></div>
+      </div>
+    </section>
+
+    <footer>颜色与样式基于你的要求（主色: #185FA5，成功: #3B6D11，警告: #A32D2D）</footer>
+  </div>
+
+  <input type="file" id="fileInput" style="display:none" accept="application/json" />
+
+  <!-- modal container -->
+  <div id="modalRoot" style="display:none"></div>
+
+  <script>
+    // 更完整的实现：包含设置面板、月度结算、导入/导出、清空、图表色彩规则等
+    const DEFAULT = {
+      transactions: [],
+      monthlyClosings: [],
+      accounts: {downpayment:0,tqqq:0,bonds:0,cash:0},
+      rsuRecords: [],
+      meta: { exportedDates: [] },
+      settings: {
+        hkdToSgd: 0.1715,
+        rmbToSgd: 0.172,
+        monthlyBudget: {food:700,transport:80,shopping:150,entertainment:150}
+      }
+    };
+
+    const FIN = {
+      monthlyIncome: 13386,
+      fixedExpenses: 7121,
+      monthlySaveTarget: 5042,
+      fourYearTarget: 242016
+    };
+
+    const LS_KEY = 'pwm_data_v1';
+    let DATA = loadData();
+
+    function loadData(){
+      const raw = localStorage.getItem(LS_KEY);
+      if(!raw) return JSON.parse(JSON.stringify(DEFAULT));
+      try{ const parsed = JSON.parse(raw); return Object.assign(JSON.parse(JSON.stringify(DEFAULT)), parsed); }catch(e){ console.error('解析 localStorage 失败',e); return JSON.parse(JSON.stringify(DEFAULT)); }
+    }
+    function saveData(d){ localStorage.setItem(LS_KEY, JSON.stringify(d)); render(); }
+
+    function $(id){ return document.getElementById(id); }
+    function fmt(n){ return Number(n).toLocaleString(undefined,{maximumFractionDigits:2}); }
+
+    $('today').textContent = new Date().toLocaleDateString();
+    $('txnDate').valueAsDate = new Date();
+
+    function convToSgd(amount,currency){
+      amount = Number(amount)||0;
+      if(currency==='SGD') return amount;
+      if(currency==='HKD') return amount * (DATA.settings.hkdToSgd||0.1715);
+      if(currency==='RMB' || currency==='CNY') return amount * (DATA.settings.rmbToSgd||0.172);
+      return amount;
+    }
+
+    function updateProg(el, value, colorClass){
+      el.style.width = (value*100) + '%';
+      if(colorClass) el.style.background = colorClass;
+      else el.style.background = 'var(--primary)';
+    }
+
+    function render(){
+      // accounts
+      $('acct-downpayment').textContent = fmt(DATA.accounts.downpayment);
+      $('acct-tqqq').textContent = fmt(DATA.accounts.tqqq);
+      $('acct-bonds').textContent = fmt(DATA.accounts.bonds);
+      $('acct-cash').textContent = fmt(DATA.accounts.cash);
+
+      const totalSaved = DATA.accounts.downpayment + DATA.accounts.tqqq + DATA.accounts.bonds + DATA.accounts.cash;
+      const fourPct = Math.min(1, totalSaved / FIN.fourYearTarget);
+      updateProg($('fourYearProg'), fourPct);
+      $('fourYearText').textContent = fmt(totalSaved) + ' / ' + fmt(FIN.fourYearTarget);
+
+      // month saved: 使用本月 allocations if exists else accounts delta: 简化为 accounts 合计
+      const monthSaved = totalSaved;
+      const savedPct = Math.min(1, monthSaved / FIN.monthlySaveTarget);
+      updateProg($('monthSavedProg'), savedPct);
+      $('monthSavedText').textContent = fmt(monthSaved) + ' / ' + fmt(FIN.monthlySaveTarget) + ' SGD';
+
+      // month spent
+      const now = new Date();
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      const monthEnd = new Date(now.getFullYear(), now.getMonth()+1, 0);
+      const monthTxns = DATA.transactions.filter(t=>{ const d=new Date(t.date); return d>=monthStart && d<=monthEnd; });
+      const spent = monthTxns.reduce((acc,t)=> t.type==='expense' ? acc + convToSgd(t.amount,t.currency) : acc, 0);
+      const budgetTotal = Object.values(DATA.settings.monthlyBudget).reduce((a,b)=>a+b,0);
+      const spentPctRaw = spent / budgetTotal;
+      const spentPct = Math.min(1, spentPctRaw);
+      // color logic: >=100% red, >=80% orange, else primary; if >100% show red
+      let spentColor = 'var(--primary)';
+      if(spentPctRaw>1) spentColor = 'linear-gradient(90deg,var(--success), var(--success))';
+      if(spentPctRaw>1) spentColor = 'var(--danger)';
+      else if(spentPctRaw>=0.8) spentColor = 'orange';
+      updateProg($('monthSpentProg'), spentPct, spentColor);
+      $('monthSpentText').textContent = fmt(spent) + ' / ' + fmt(budgetTotal) + ' SGD';
+
+      // days remaining
+      const lastDay = new Date(now.getFullYear(), now.getMonth()+1, 0);
+      const diff = Math.ceil((lastDay - now)/(1000*60*60*24));
+      $('daysRemaining').textContent = diff;
+
+      // txn list (today)
+      const todayStr = new Date().toISOString().slice(0,10);
+      const todayTxns = DATA.transactions.filter(t=> t.date===todayStr).slice().reverse();
+      const tl = $('txnList'); tl.innerHTML = '';
+      let todaySum = 0;
+      todayTxns.forEach((t,i)=>{
+        const div = document.createElement('div'); div.className='txn-item';
+        const left = document.createElement('div'); left.innerHTML = `<div>${t.category} ${t.note?('- '+t.note):''}</div><div class='small muted'>${t.currency} · ${t.date}</div>`;
+        const right = document.createElement('div');
+        right.style.display='flex'; right.style.alignItems='center';
+        const amtElem = document.createElement('div'); amtElem.innerHTML = `<div style='color:${t.type==='expense'?"#A32D2D":"#3B6D11"}'>${t.type==='expense'?'-':'+'}${fmt(t.amount)} ${t.currency}</div>`;
+        const edit = document.createElement('button'); edit.className='btn-ghost'; edit.textContent='编辑'; edit.style.marginLeft='8px';
+        edit.onclick = ()=> openEditTxnById(t.id);
+        const del = document.createElement('button'); del.className='btn-ghost'; del.textContent='删除'; del.style.marginLeft='8px';
+        del.onclick = ()=>{ if(confirm('删除该条记录?')){ deleteTxnById(t.id); } };
+        right.appendChild(amtElem); right.appendChild(edit); right.appendChild(del);
+        div.appendChild(left); div.appendChild(right); tl.appendChild(div);
+        if(t.type==='expense') todaySum += convToSgd(t.amount,t.currency);
+      });
+      $('todaySpent').textContent = fmt(todaySum);
+
+      // category bars (this month)
+      const catMap = {};
+      monthTxns.forEach(t=>{ if(t.type==='expense'){ catMap[t.category] = (catMap[t.category]||0) + convToSgd(t.amount,t.currency); } });
+  const cb = $('categoryBars'); cb.innerHTML='';
+      const maxVal = Math.max(1, ...Object.values(catMap));
+      Object.keys(catMap).forEach(k=>{
+        const v = catMap[k];
+        const row = document.createElement('div'); row.style.display='flex'; row.style.alignItems='center'; row.style.gap='8px'; row.style.marginBottom='8px';
+        const label = document.createElement('div'); label.style.width='90px'; label.textContent = k;
+        const barWrap = document.createElement('div'); barWrap.style.flex='1'; barWrap.style.background='#eee'; barWrap.style.borderRadius='6px';
+        const bar = document.createElement('div'); bar.style.height='14px'; bar.style.background='var(--primary)'; bar.style.width = Math.min(100, (v/maxVal)*100) + '%'; bar.style.borderRadius='6px';
+        barWrap.appendChild(bar);
+        const val = document.createElement('div'); val.style.width='80px'; val.className='small muted'; val.textContent = fmt(v)+' SGD';
+        row.appendChild(label); row.appendChild(barWrap); row.appendChild(val);
+        cb.appendChild(row);
+      });
+
+      // monthly list
+      const mm = $('monthlyList'); mm.innerHTML='';
+      DATA.monthlyClosings.slice().reverse().forEach(m=>{
+        const el = document.createElement('div'); el.innerHTML = `<div>${m.month}: 保存 ${fmt(m.totalSaved)} SGD，支出 ${fmt(m.totalExpense)} SGD，收入 ${fmt(m.totalIncome)} SGD</div>`;
+        mm.appendChild(el);
+      });
+
+      // daily records (右侧的每日记录，最近7天)
+      const dr = document.getElementById('dailyRecords'); if(dr){ dr.innerHTML='';
+        const days = [];
+        for(let i=0;i<7;i++){ const d=new Date(); d.setDate(d.getDate()-i); days.push(d); }
+        days.forEach(d=>{
+          const ds = d.toISOString().slice(0,10);
+          const arr = DATA.transactions.filter(t=> t.date===ds).slice().reverse();
+          const dayDiv = document.createElement('div'); dayDiv.style.marginBottom='8px';
+          const hdr = document.createElement('div'); hdr.innerHTML = `<strong>${ds}</strong> <span class='small muted'>(${arr.length} 笔)</span>`;
+          dayDiv.appendChild(hdr);
+          arr.forEach(t=>{
+            const item = document.createElement('div'); item.className='txn-item';
+            const left = document.createElement('div'); left.textContent = `${t.category} ${t.note?'- '+t.note:''}`;
+            const right = document.createElement('div'); right.style.display='flex'; right.style.alignItems='center';
+            const val = document.createElement('div'); val.innerHTML = `<div style='color:${t.type==='expense'?"#A32D2D":"#3B6D11"}'>${t.type==='expense'?'-':'+'}${fmt(t.amount)} ${t.currency}</div>`;
+            const eBtn = document.createElement('button'); eBtn.className='btn-ghost'; eBtn.textContent='编辑'; eBtn.style.marginLeft='8px'; eBtn.onclick = ()=> openEditTxnById(t.id);
+            const dBtn = document.createElement('button'); dBtn.className='btn-ghost'; dBtn.textContent='删除'; dBtn.style.marginLeft='8px'; dBtn.onclick = ()=>{ if(confirm('删除该条记录?')) deleteTxnById(t.id); };
+            right.appendChild(val); right.appendChild(eBtn); right.appendChild(dBtn);
+            item.appendChild(left); item.appendChild(right); dayDiv.appendChild(item);
+          });
+          dr.appendChild(dayDiv);
+        });
+      }
+
+      saveData(DATA);
+    }
+
+    // delete by id
+    function deleteTxnById(id){
+      const idx = DATA.transactions.findIndex(x=>x.id===id);
+      if(idx!==-1){ DATA.transactions.splice(idx,1); saveData(DATA); }
+    }
+
+    function openEditTxnById(id){
+      const txn = DATA.transactions.find(x=>x.id===id); if(!txn) return alert('找不到记录');
+      openEditTxn(txn);
+    }
+
+    // export yesterday to CSV
+    function exportYesterdayCSV(){
+      const y = new Date(); y.setDate(y.getDate()-1); const ys = y.toISOString().slice(0,10);
+      const rows = DATA.transactions.filter(t=> t.date===ys);
+      if(rows.length===0) return alert('昨天无记录可导出');
+      const header = ['id','date','type','amount','currency','category','note'];
+      const csv = [header.join(',')].concat(rows.map(r=> [r.id,r.date,r.type,r.amount,r.currency,`"${(r.category||'').replace(/"/g,'""')}"`,`"${(r.note||'').replace(/"/g,'""')}"`].join(','))).join('\n');
+      const blob = new Blob([csv],{type:'text/csv'});
+      const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href=url; a.download=`pwm_${ys}.csv`; a.click(); URL.revokeObjectURL(url);
+      // mark exported
+      DATA.meta = DATA.meta || { exportedDates: [] };
+      if(!DATA.meta.exportedDates.includes(ys)) DATA.meta.exportedDates.push(ys);
+      saveData(DATA);
+    }
+
+    // on load: if yesterday not exported, prompt to export
+    (function promptExportYesterday(){
+      try{
+        const y = new Date(); y.setDate(y.getDate()-1); const ys = y.toISOString().slice(0,10);
+        DATA.meta = DATA.meta || { exportedDates: [] };
+        if(!DATA.meta.exportedDates.includes(ys)){
+          // if there are records for yesterday, ask user
+          const rows = DATA.transactions.filter(t=> t.date===ys);
+          if(rows.length>0){
+            if(confirm(`发现 ${ys} 有 ${rows.length} 条记录，是否导出为 CSV 以备份到 Excel？`)){
+              exportYesterdayCSV();
+            }
+          }
+        }
+      }catch(e){console.error(e)}
+    })();
+
+    // add txn
+    $('addTxn').onclick = ()=>{
+      const type = $('txnType').value;
+      const amount = Number($('txnAmount').value);
+      const currency = $('txnCurrency').value;
+      const category = $('txnCategory').value;
+      const note = $('txnNote').value;
+      const date = $('txnDate').value || new Date().toISOString().slice(0,10);
+      if(!amount || isNaN(amount)) return alert('请输入有效金额');
+      const obj = { id: crypto.randomUUID(), date, amount, currency, category, note, type };
+      DATA.transactions.push(obj); saveData(DATA); $('txnAmount').value=''; $('txnNote').value='';
+    };
+
+    function openEditTxn(txn){
+      const modal = document.createElement('div'); modal.className='modal';
+      modal.innerHTML = `<div class='card'>
+        <h3>编辑交易</h3>
+        <div class='row'><label>类型</label><select id='eType'><option value='expense'>支出</option><option value='income'>收入</option></select></div>
+        <div class='row'><label>金额</label><input id='eAmount' /></div>
+        <div class='row'><label>货币</label><select id='eCurrency'><option>SGD</option><option>HKD</option><option>RMB</option></select></div>
+        <div class='row'><label>类别</label><input id='eCategory' /></div>
+        <div class='row'><label>备注</label><input id='eNote' /></div>
+        <div class='row'><label>日期</label><input id='eDate' type='date' /></div>
+        <div style='margin-top:10px;display:flex;gap:8px;justify-content:flex-end'><button id='eSave' class='btn'>保存</button><button id='eCancel' class='btn-ghost'>取消</button></div>
+      </div>`;
+      document.body.appendChild(modal);
+      const set = (id,val)=> modal.querySelector('#'+id).value = val;
+      set('eType', txn.type); set('eAmount', txn.amount); set('eCurrency', txn.currency); set('eCategory', txn.category); set('eNote', txn.note||''); set('eDate', txn.date);
+      modal.querySelector('#eCancel').onclick = ()=> modal.remove();
+      modal.querySelector('#eSave').onclick = ()=>{
+        txn.type = modal.querySelector('#eType').value;
+        txn.amount = Number(modal.querySelector('#eAmount').value)||0;
+        txn.currency = modal.querySelector('#eCurrency').value;
+        txn.category = modal.querySelector('#eCategory').value;
+        txn.note = modal.querySelector('#eNote').value;
+        txn.date = modal.querySelector('#eDate').value;
+        saveData(DATA); modal.remove();
+      };
+    }
+
+    // account edit
+    document.querySelectorAll('.btn-ghost[data-acct]').forEach(b=>{
+      b.onclick = ()=>{
+        const key = b.dataset.acct;
+        const val = prompt('输入金额 (SGD)', DATA.accounts[key]);
+        if(val!==null){ DATA.accounts[key] = Number(val)||0; saveData(DATA); }
+      }
+    });
+
+    // settings modal
+    $('settingsBtn').onclick = ()=>{
+      openSettings();
+    };
+
+    function openSettings(){
+      const modal = document.createElement('div'); modal.className='modal';
+      modal.innerHTML = `<div class='card'>
+        <h3>设置</h3>
+        <div class='row'><label>HKD -> SGD 汇率</label><input id='sHkd' class='flex' /></div>
+        <div class='row'><label>RMB -> SGD 汇率</label><input id='sRmb' class='flex' /></div>
+        <div style='margin-top:8px'><strong>月度预算</strong></div>
+        <div class='row'><label>餐饮</label><input id='bFood' /></div>
+        <div class='row'><label>交通</label><input id='bTransport' /></div>
+        <div class='row'><label>衣物/日用</label><input id='bShopping' /></div>
+        <div class='row'><label>娱乐/杂项</label><input id='bEnt' /></div>
+        <div style='margin-top:10px;display:flex;gap:8px;justify-content:flex-end'><button id='sSave' class='btn'>保存</button><button id='sCancel' class='btn-ghost'>取消</button></div>
+      </div>`;
+      document.body.appendChild(modal);
+      modal.querySelector('#sHkd').value = DATA.settings.hkdToSgd;
+      modal.querySelector('#sRmb').value = DATA.settings.rmbToSgd;
+      modal.querySelector('#bFood').value = DATA.settings.monthlyBudget.food;
+      modal.querySelector('#bTransport').value = DATA.settings.monthlyBudget.transport;
+      modal.querySelector('#bShopping').value = DATA.settings.monthlyBudget.shopping;
+      modal.querySelector('#bEnt').value = DATA.settings.monthlyBudget.entertainment;
+      modal.querySelector('#sCancel').onclick = ()=> modal.remove();
+      modal.querySelector('#sSave').onclick = ()=>{
+        DATA.settings.hkdToSgd = Number(modal.querySelector('#sHkd').value)||DATA.settings.hkdToSgd;
+        DATA.settings.rmbToSgd = Number(modal.querySelector('#sRmb').value)||DATA.settings.rmbToSgd;
+        DATA.settings.monthlyBudget.food = Number(modal.querySelector('#bFood').value)||DATA.settings.monthlyBudget.food;
+        DATA.settings.monthlyBudget.transport = Number(modal.querySelector('#bTransport').value)||DATA.settings.monthlyBudget.transport;
+        DATA.settings.monthlyBudget.shopping = Number(modal.querySelector('#bShopping').value)||DATA.settings.monthlyBudget.shopping;
+        DATA.settings.monthlyBudget.entertainment = Number(modal.querySelector('#bEnt').value)||DATA.settings.monthlyBudget.entertainment;
+        saveData(DATA); modal.remove();
+      };
+    }
+
+    // export/import/clear
+    $('exportBtn').onclick = ()=>{
+      const blob = new Blob([JSON.stringify(DATA,null,2)],{type:'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = 'pwm_export.json'; a.click(); URL.revokeObjectURL(url);
+    };
+    $('importBtn').onclick = ()=>{ $('fileInput').click(); };
+    $('fileInput').onchange = (e)=>{
+      const f = e.target.files[0]; if(!f) return;
+      const reader = new FileReader();
+      reader.onload = ()=>{
+        try{ const im = JSON.parse(reader.result); // basic validation
+          if(!im.transactions) return alert('无效数据');
+          if(confirm('导入将覆盖当前数据，继续？')){ DATA = Object.assign(JSON.parse(JSON.stringify(DEFAULT)), im); saveData(DATA); }
+        }catch(err){ alert('导入失败: '+err); }
+      };
+      reader.readAsText(f);
+    };
+
+    $('clearBtn').onclick = ()=>{
+      if(confirm('确认清空所有本地数据？此操作无法撤销。')){ DATA = JSON.parse(JSON.stringify(DEFAULT)); saveData(DATA); }
+    };
+
+    // monthly closing
+    $('makeClosing').onclick = ()=> openMonthlyClosing();
+
+    function openMonthlyClosing(){
+      const modal = document.createElement('div'); modal.className='modal';
+      const now = new Date(); const monthKey = now.toISOString().slice(0,7);
+      modal.innerHTML = `<div class='card'>
+        <h3>月度结算 (${monthKey})</h3>
+        <div class='small muted'>输入本月实际储蓄并分配到四个账户</div>
+        <div class='row'><label>本月实际储蓄 (SGD)</label><input id='cSaved' /></div>
+        <div class='row'><label>是否有 bonus</label><input id='cBonus' /></div>
+        <div style='margin-top:8px'><strong>自动分配比例 (默认)</strong></div>
+        <div class='row'><label>首付</label><input id='cDown' /></div>
+        <div class='row'><label>TQQQ</label><input id='cTqqq' /></div>
+        <div class='row'><label>短债</label><input id='cBonds' /></div>
+        <div class='row'><label>零钱</label><input id='cCash' /></div>
+        <div style='margin-top:10px;display:flex;gap:8px;justify-content:flex-end'><button id='cSave' class='btn'>保存并结算</button><button id='cCancel' class='btn-ghost'>取消</button></div>
+      </div>`;
+      document.body.appendChild(modal);
+      modal.querySelector('#cSaved').value = '';
+      modal.querySelector('#cBonus').value = 0;
+      modal.querySelector('#cDown').value = 4000;
+      modal.querySelector('#cTqqq').value = 500;
+      modal.querySelector('#cBonds').value = 500;
+      modal.querySelector('#cCash').value = 42;
+      modal.querySelector('#cCancel').onclick = ()=> modal.remove();
+      modal.querySelector('#cSave').onclick = ()=>{
+        const saved = Number(modal.querySelector('#cSaved').value)||0;
+        const bonus = Number(modal.querySelector('#cBonus').value)||0;
+        const alloc = {
+          downpayment: Number(modal.querySelector('#cDown').value)||0,
+          tqqq: Number(modal.querySelector('#cTqqq').value)||0,
+          bonds: Number(modal.querySelector('#cBonds').value)||0,
+          cash: Number(modal.querySelector('#cCash').value)||0,
+        };
+        // apply allocations proportionally scaled to saved if sum differs
+        const allocSum = alloc.downpayment + alloc.tqqq + alloc.bonds + alloc.cash;
+        const scale = allocSum>0 ? saved/allocSum : 0;
+        const finalAlloc = {
+          downpayment: Math.round((alloc.downpayment*scale+Number.EPSILON)*100)/100,
+          tqqq: Math.round((alloc.tqqq*scale+Number.EPSILON)*100)/100,
+          bonds: Math.round((alloc.bonds*scale+Number.EPSILON)*100)/100,
+          cash: Math.round((alloc.cash*scale+Number.EPSILON)*100)/100,
+        };
+        // add bonus directly to downpayment by default if any
+        if(bonus>0){ finalAlloc.downpayment += bonus; }
+        // update accounts
+        DATA.accounts.downpayment += finalAlloc.downpayment;
+        DATA.accounts.tqqq += finalAlloc.tqqq;
+        DATA.accounts.bonds += finalAlloc.bonds;
+        DATA.accounts.cash += finalAlloc.cash;
+        // record monthly closing
+        DATA.monthlyClosings.push({
+          month: monthKey,
+          totalIncome: FIN.monthlyIncome,
+          totalExpense: DATA.transactions.reduce((a,t)=> a + (t.type==='expense'?convToSgd(t.amount,t.currency):0),0),
+          totalSaved: saved + bonus,
+          bonus: bonus,
+          accountAllocations: finalAlloc
+        });
+        saveData(DATA);
+        modal.remove();
+        alert('月度结算已保存');
+      };
+    }
+
+    // initial sample
+    if(DATA.transactions.length===0){
+      DATA.transactions.push({id:crypto.randomUUID(),date:new Date().toISOString().slice(0,10),amount:12.5,currency:'SGD',category:'餐饮',note:'午餐',type:'expense'});
+      saveData(DATA);
+    }
+
+    render();
+  </script>
+</body>
+</html>
